@@ -16,7 +16,7 @@
         </div>
     </div>
 
-    <!-- Mobile Nav Dropdown (All features restored!) -->
+    <!-- Mobile Nav Dropdown -->
     <nav id="mobile-nav" class="dropdown-nav" style="display: none;">
         <div class="menu-grid">
             <a href="add_stock.php" role="button" class="outline">📥 Stock In</a>
@@ -24,6 +24,7 @@
             <a href="add_expense.php" role="button" class="outline">📉 Expense</a>
             <a href="add_product.php" role="button" class="outline">📦 Add Product</a>
             <a href="workers.php" role="button" class="outline">👥 Workers</a>
+            <a href="analytics.php" role="button" style="background-color: #3b82f6; border-color: #3b82f6; grid-column: span 3; text-align: center;">📊 Interval Analytics</a>
         </div>
     </nav>
 </header>
