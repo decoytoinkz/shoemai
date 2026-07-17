@@ -25,7 +25,7 @@
     </ul>
     <ul>
         <li><a href="add_stock.php" class="outline">📥 Stock In</a></li>
-        <li><a href="add_sales.php" class="outline">💰 Record Sale</a></li>
+        <li><a href="log_sale.php" class="outline">💰 Record Sale</a></li>
         <li><a href="add_expense.php" class="outline">📉 Expense</a></li>
     </ul>
 </nav>
