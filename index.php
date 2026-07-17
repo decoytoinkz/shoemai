@@ -204,7 +204,8 @@ $active_sellers = $pdo->query("SELECT name FROM sellers WHERE status = 'active' 
         <!-- Breakdown Ledger Layout with Action Button Inline -->
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; margin-top: 30px;">
             <h3 style="margin: 0;">Product Breakdown</h3>
-            <a href="add_stock.php" class="button" style="background-color: #10b981; border-color: #10b981; padding: 6px 15px; font-size: 0.9rem; margin: 0;">+ Add Stock</a>
+            <a href="add_stock.php" class="button" style="background-color: #10b981; border-color: #10b981; color: #ffffff; padding: 6px 15px; font-size: 0.9rem; margin: 0;">+ Add Stock</a>
+            <a href="log_sale.php" class="button" style="background-color: #10b981; border-color: #10b981; color: #ffffff; padding: 6px 15px; font-size: 0.9rem; margin: 0;">+ Add Sale</a>
         </div>
 
         <div class="scroll-x">
