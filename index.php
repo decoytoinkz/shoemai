@@ -2,6 +2,9 @@
 require 'auth.php';
 require 'db.php';
 
+// 1. Check if a specific seller filter is active
+$seller_filter = isset($_GET['seller']) ? $_GET['seller'] : '';
+
 // --- INTEGRATION: Handle quick inline stock correction ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'quick_stock_edit') {
     $p_id = $_POST['product_id'] ?? null;
@@ -33,8 +36,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 }
 
-// 1. Check if a specific seller filter is active
-$seller_filter = isset($_GET['seller']) ? $_GET['seller'] : '';
+// --- INTEGRATION: Handle quick inline sold correction ---
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'quick_sold_edit') {
+    $p_id = $_POST['product_id'] ?? null;
+    $new_sold = $_POST['new_sold'] ?? null;
+    
+    if ($p_id !== null && $new_sold !== null) {
+        try {
+            // Check if a sales entry already exists for this product (filtered by seller if selected)
+            if ($seller_filter) {
+                $check_stmt = $pdo->prepare("SELECT COUNT(*) FROM sales WHERE product_id = ? AND seller = ?");
+                $check_stmt->execute([$p_id, $seller_filter]);
+            } else {
+                $check_stmt = $pdo->prepare("SELECT COUNT(*) FROM sales WHERE product_id = ?");
+                $check_stmt->execute([$p_id]);
+            }
+            $exists = $check_stmt->fetchColumn();
+
+            if ($exists > 0) {
+                if ($seller_filter) {
+                    $update_stmt = $pdo->prepare("UPDATE sales SET quantity_sold = ? WHERE product_id = ? AND seller = ?");
+                    $update_stmt->execute([$new_sold, $p_id, $seller_filter]);
+                } else {
+                    // If globally editing without seller filter, target the first recorded sale entry
+                    $id_stmt = $pdo->prepare("SELECT id FROM sales WHERE product_id = ? LIMIT 1");
+                    $id_stmt->execute([$p_id]);
+                    $sale_id = $id_stmt->fetchColumn();
+                    if ($sale_id) {
+                        $update_stmt = $pdo->prepare("UPDATE sales SET quantity_sold = ? WHERE id = ?");
+                        $update_stmt->execute([$new_sold, $sale_id]);
+                    }
+                }
+            } else {
+                // If no sales record exists, create one using the selected seller (or 'Default' if none chosen)
+                $assigned_seller = $seller_filter ? $seller_filter : 'Default';
+                $insert_stmt = $pdo->prepare("INSERT INTO sales (product_id, quantity_sold, date_sold, seller) VALUES (?, ?, CURRENT_DATE, ?)");
+                $insert_stmt->execute([$p_id, $new_sold, $assigned_seller]);
+            }
+            
+            // Refresh page to calculate new totals automatically
+            header("Location: index.php" . ($seller_filter ? "?seller=" . urlencode($seller_filter) : ""));
+            exit;
+        } catch (PDOException $e) {
+            die("Quick Sold Update Failed: " . $e->getMessage());
+        }
+    }
+}
 
 // 2. Fetch Time-Based Profit & Expense Analytics
 $seller_where_sales = $seller_filter ? "WHERE s.seller = :seller" : "";
@@ -236,7 +283,6 @@ $active_sellers = $pdo->query("SELECT name FROM sellers WHERE status = 'active' 
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; margin-top: 30px;">
             <h3 style="margin: 0;">Product Breakdown</h3>
             <a href="add_stock.php" class="button" style="background-color: #10b981; border-color: #10b981; color: #ffffff; padding: 6px 15px; font-size: 0.9rem; margin: 0;">+ Add Stock</a>
-            <a href="log_sale.php" class="button" style="background-color: #10b981; border-color: #10b981; color: #ffffff; padding: 6px 15px; font-size: 0.9rem; margin: 0;">+ Add Sale</a>
         </div>
 
         <div class="scroll-x">
@@ -246,7 +292,7 @@ $active_sellers = $pdo->query("SELECT name FROM sellers WHERE status = 'active' 
                         <th>Product</th>
                         <th style="min-width: 140px;">Stock In</th>
                         <th>Left</th>
-                        <th>Sold</th>
+                        <th style="min-width: 140px;">Sold</th>
                         <th>Sales</th>
                         <th>Profit</th>
                     </tr>
@@ -257,9 +303,9 @@ $active_sellers = $pdo->query("SELECT name FROM sellers WHERE status = 'active' 
                         <tr>
                             <td><strong><?= htmlspecialchars($p['name']) ?></strong></td>
                             
-                            <!-- INTEGRATION: Inline Edit Input Column instead of static value -->
+                            <!-- Inline Stock In Edit Column -->
                             <td>
-                                <form method="POST" action="index.php" style="display: flex; align-items: center; gap: 5px; margin: 0;">
+                                <form method="POST" action="index.php<?= $seller_filter ? '?seller=' . urlencode($seller_filter) : '' ?>" style="display: flex; align-items: center; gap: 5px; margin: 0;">
                                     <input type="hidden" name="action" value="quick_stock_edit">
                                     <input type="hidden" name="product_id" value="<?= $p['id'] ?>">
                                     <input type="number" name="new_stock" value="<?= $p['stock_in'] ?>" min="0" 
@@ -272,7 +318,21 @@ $active_sellers = $pdo->query("SELECT name FROM sellers WHERE status = 'active' 
                             </td>
 
                             <td><?= $p['left_stock'] ?></td>
-                            <td><?= $p['sold'] ?></td>
+                            
+                            <!-- INTEGRATION: Inline Sold Edit Column -->
+                            <td>
+                                <form method="POST" action="index.php<?= $seller_filter ? '?seller=' . urlencode($seller_filter) : '' ?>" style="display: flex; align-items: center; gap: 5px; margin: 0;">
+                                    <input type="hidden" name="action" value="quick_sold_edit">
+                                    <input type="hidden" name="product_id" value="<?= $p['id'] ?>">
+                                    <input type="number" name="new_sold" value="<?= $p['sold'] ?>" min="0" 
+                                           style="padding: 4px 8px; font-size: 0.9rem; margin: 0; height: auto; text-align: center;">
+                                    <button type="submit" class="outline" 
+                                            style="padding: 4px 10px; margin: 0; width: auto; height: auto; border-color: #10b981; color: #10b981;">
+                                        ✓
+                                    </button>
+                                </form>
+                            </td>
+
                             <td>₱<?= number_format($p['sales'], 2) ?></td>
                             <td>₱<?= number_format($p['profit'], 2) ?></td>
                         </tr>
