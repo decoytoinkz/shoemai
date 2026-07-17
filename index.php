@@ -8,12 +8,31 @@ $seller_filter = isset($_GET['seller']) ? $_GET['seller'] : '';
 $seller_where_sales = $seller_filter ? "WHERE s.seller = :seller" : "";
 $seller_where_expenses = $seller_filter ? "WHERE e.seller = :seller" : "";
 
+// Detect driver type for cross-database compatibility (MySQL vs PostgreSQL)
+$isPostgres = ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql');
+
+if ($isPostgres) {
+    // PostgreSQL compliant syntax
+    $today = "CURRENT_DATE";
+    $sales_week_condition = "EXTRACT(WEEK FROM s.date_sold) = EXTRACT(WEEK FROM CURRENT_DATE) AND EXTRACT(YEAR FROM s.date_sold) = EXTRACT(YEAR FROM CURRENT_DATE)";
+    $expense_week_condition = "EXTRACT(WEEK FROM e.date_incurred) = EXTRACT(WEEK FROM CURRENT_DATE) AND EXTRACT(YEAR FROM e.date_incurred) = EXTRACT(YEAR FROM CURRENT_DATE)";
+    $sales_month_condition = "EXTRACT(MONTH FROM s.date_sold) = EXTRACT(MONTH FROM CURRENT_DATE) AND EXTRACT(YEAR FROM s.date_sold) = EXTRACT(YEAR FROM CURRENT_DATE)";
+    $expense_month_condition = "EXTRACT(MONTH FROM e.date_incurred) = EXTRACT(MONTH FROM CURRENT_DATE) AND EXTRACT(YEAR FROM e.date_incurred) = EXTRACT(YEAR FROM CURRENT_DATE)";
+} else {
+    // Local MySQL/XAMPP syntax
+    $today = "CURDATE()";
+    $sales_week_condition = "YEARWEEK(s.date_sold, 0) = YEARWEEK(CURDATE(), 0)";
+    $expense_week_condition = "YEARWEEK(e.date_incurred, 0) = YEARWEEK(CURDATE(), 0)";
+    $sales_month_condition = "MONTH(s.date_sold) = MONTH(CURDATE()) AND YEAR(s.date_sold) = YEAR(CURDATE())";
+    $expense_month_condition = "MONTH(e.date_incurred) = MONTH(CURDATE()) AND YEAR(e.date_incurred) = YEAR(CURDATE())";
+}
+
 $analytics_query = "
     SELECT 
         -- Gross Profits (Sales - Cost of Goods Sold)
-        SUM(CASE WHEN DATE(s.date_sold) = CURDATE() THEN (s.quantity_sold * p.price) - (s.quantity_sold * p.cost_pc) ELSE 0 END) as daily_gross_profit,
-        SUM(CASE WHEN YEARWEEK(s.date_sold, 0) = YEARWEEK(CURDATE(), 0) THEN (s.quantity_sold * p.price) - (s.quantity_sold * p.cost_pc) ELSE 0 END) as weekly_gross_profit,
-        SUM(CASE WHEN MONTH(s.date_sold) = MONTH(CURDATE()) AND YEAR(s.date_sold) = YEAR(CURDATE()) THEN (s.quantity_sold * p.price) - (s.quantity_sold * p.cost_pc) ELSE 0 END) as monthly_gross_profit,
+        SUM(CASE WHEN DATE(s.date_sold) = $today THEN (s.quantity_sold * p.price) - (s.quantity_sold * p.cost_pc) ELSE 0 END) as daily_gross_profit,
+        SUM(CASE WHEN $sales_week_condition THEN (s.quantity_sold * p.price) - (s.quantity_sold * p.cost_pc) ELSE 0 END) as weekly_gross_profit,
+        SUM(CASE WHEN $sales_month_condition THEN (s.quantity_sold * p.price) - (s.quantity_sold * p.cost_pc) ELSE 0 END) as monthly_gross_profit,
         SUM((s.quantity_sold * p.price) - (s.quantity_sold * p.cost_pc)) as total_gross_profit
     FROM sales s
     JOIN products p ON s.product_id = p.id
@@ -22,9 +41,9 @@ $analytics_query = "
 
 $expense_query = "
     SELECT 
-        SUM(CASE WHEN DATE(e.date_incurred) = CURDATE() THEN e.amount ELSE 0 END) as daily_expenses,
-        SUM(CASE WHEN YEARWEEK(e.date_incurred, 0) = YEARWEEK(CURDATE(), 0) THEN e.amount ELSE 0 END) as weekly_expenses,
-        SUM(CASE WHEN MONTH(e.date_incurred) = MONTH(CURDATE()) AND YEAR(e.date_incurred) = YEAR(CURDATE()) THEN e.amount ELSE 0 END) as monthly_expenses,
+        SUM(CASE WHEN DATE(e.date_incurred) = $today THEN e.amount ELSE 0 END) as daily_expenses,
+        SUM(CASE WHEN $expense_week_condition THEN e.amount ELSE 0 END) as weekly_expenses,
+        SUM(CASE WHEN $expense_month_condition THEN e.amount ELSE 0 END) as monthly_expenses,
         SUM(e.amount) as total_expenses
     FROM expenses e
     $seller_where_expenses
@@ -131,9 +150,6 @@ $active_sellers = $pdo->query("SELECT name FROM sellers WHERE status = 'active' 
 </head>
 <body class="container">
     <?php include 'header.php'; ?>
-
-
-        
 
     <main>
         <!-- DYNAMIC Seller Performance Toggle -->
