@@ -5,7 +5,7 @@
             <a href="index.php" style="text-decoration: none; color: inherit;">🥟 Maki's Siomai</a>
         </h2>
         
-        <!-- Header Button Group (Always visible) -->
+        <!-- Header Button Group -->
         <div style="display: flex; align-items: center; gap: 8px;">
             <a href="index.php" role="button" class="outline" style="width: auto; padding: 6px 12px; margin: 0; font-size: 0.9rem; border-color: #374151; white-space: nowrap;">
                 Home
@@ -16,47 +16,59 @@
         </div>
     </div>
 
-    <!-- Mobile Nav Dropdown (Hidden by default, slides down smoothly) -->
+    <!-- Mobile Nav Dropdown (All features restored!) -->
     <nav id="mobile-nav" class="dropdown-nav" style="display: none;">
-        <ul>
-            <li><a href="add_stock.php" class="outline">📥 Stock In</a></li>
-            <li><a href="log_sale.php" class="outline">💰 Record Sale</a></li>
-            <li><a href="add_expense.php" class="outline">📉 Expense</a></li>
-        </ul>
+        <div class="menu-grid">
+            <a href="add_stock.php" role="button" class="outline">📥 Stock In</a>
+            <a href="log_sale.php" role="button" class="outline">💰 Record Sale</a>
+            <a href="add_expense.php" role="button" class="outline">📉 Expense</a>
+            <a href="add_product.php" role="button" class="outline">📦 Add Product</a>
+            <a href="workers.php" role="button" class="outline">👥 Workers</a>
+        </div>
     </nav>
 </header>
 
 <style>
-/* Make the entire header bar sticky at the very top */
 .sticky-header {
     position: sticky;
     top: 0;
     z-index: 1000;
-    background: #111923; /* Matches Pico CSS dark theme background */
+    background: #111923;
     border-bottom: 1px solid #374151;
     margin-bottom: 20px;
 }
 
-/* Style the dropdown menu so it appears clean when opened */
 .dropdown-nav {
     background: #182330;
     border-top: 1px solid #374151;
     padding: 15px 20px;
 }
 
-.dropdown-nav ul {
-    display: flex;
-    flex-direction: column;
+/* Arrange menu items in a clean, responsive grid layout */
+.menu-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr); /* 3 items on the first row */
     gap: 10px;
-    list-style: none;
-    margin: 0;
-    padding: 0;
 }
 
-.dropdown-nav ul li a {
-    display: block;
-    width: 100%;
+/* Make the last two items stretch cleanly or format on the second row */
+.menu-grid a {
     text-align: center;
+    padding: 10px 5px;
+    font-size: 0.85rem;
+    white-space: nowrap;
+    margin: 0;
+}
+
+/* Adjust grid for smaller phones so things fit perfectly */
+@media (max-width: 480px) {
+    .menu-grid {
+        grid-template-columns: repeat(2, 1fr); /* Switch to 2 columns on small screens */
+    }
+    .menu-grid a {
+        font-size: 0.8rem;
+        padding: 8px 4px;
+    }
 }
 </style>
 
@@ -65,7 +77,7 @@ document.getElementById('menu-toggle').addEventListener('click', function() {
     var nav = document.getElementById('mobile-nav');
     if (nav.style.display === 'none' || nav.style.display === '') {
         nav.style.display = 'block';
-        this.textContent = '✕'; // Change burger to close icon
+        this.textContent = '✕';
     } else {
         nav.style.display = 'none';
         this.textContent = '☰';
