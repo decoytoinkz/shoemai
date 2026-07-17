@@ -2,6 +2,37 @@
 require 'auth.php';
 require 'db.php';
 
+// --- INTEGRATION: Handle quick inline stock correction ---
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'quick_stock_edit') {
+    $p_id = $_POST['product_id'] ?? null;
+    $new_stock = $_POST['new_stock'] ?? null;
+    
+    if ($p_id !== null && $new_stock !== null) {
+        try {
+            // First check if an inventory entry already exists for this product
+            $check_stmt = $pdo->prepare("SELECT COUNT(*) FROM inventory WHERE product_id = ?");
+            $check_stmt->execute([$p_id]);
+            $exists = $check_stmt->fetchColumn();
+
+            if ($exists > 0) {
+                // Update the sum of inventory by adjusting the existing log
+                $update_stmt = $pdo->prepare("UPDATE inventory SET quantity_added = ? WHERE product_id = ?");
+                $update_stmt->execute([$new_stock, $p_id]);
+            } else {
+                // If there's no inventory logged yet, create a fresh record
+                $insert_stmt = $pdo->prepare("INSERT INTO inventory (product_id, quantity_added, date_added) VALUES (?, ?, CURRENT_DATE)");
+                $insert_stmt->execute([$p_id, $new_stock]);
+            }
+            
+            // Refresh page to calculate new "Left" stock totals automatically
+            header("Location: index.php" . ($seller_filter ? "?seller=" . urlencode($seller_filter) : ""));
+            exit;
+        } catch (PDOException $e) {
+            die("Quick Stock Update Failed: " . $e->getMessage());
+        }
+    }
+}
+
 // 1. Check if a specific seller filter is active
 $seller_filter = isset($_GET['seller']) ? $_GET['seller'] : '';
 
@@ -213,7 +244,7 @@ $active_sellers = $pdo->query("SELECT name FROM sellers WHERE status = 'active' 
                 <thead>
                     <tr>
                         <th>Product</th>
-                        <th>Stock In</th>
+                        <th style="min-width: 140px;">Stock In</th>
                         <th>Left</th>
                         <th>Sold</th>
                         <th>Sales</th>
@@ -225,7 +256,21 @@ $active_sellers = $pdo->query("SELECT name FROM sellers WHERE status = 'active' 
                         <?php foreach ($products as $p): ?>
                         <tr>
                             <td><strong><?= htmlspecialchars($p['name']) ?></strong></td>
-                            <td><?= $p['stock_in'] ?></td>
+                            
+                            <!-- INTEGRATION: Inline Edit Input Column instead of static value -->
+                            <td>
+                                <form method="POST" action="index.php" style="display: flex; align-items: center; gap: 5px; margin: 0;">
+                                    <input type="hidden" name="action" value="quick_stock_edit">
+                                    <input type="hidden" name="product_id" value="<?= $p['id'] ?>">
+                                    <input type="number" name="new_stock" value="<?= $p['stock_in'] ?>" min="0" 
+                                           style="padding: 4px 8px; font-size: 0.9rem; margin: 0; height: auto; text-align: center;">
+                                    <button type="submit" class="outline" 
+                                            style="padding: 4px 10px; margin: 0; width: auto; height: auto; border-color: #10b981; color: #10b981;">
+                                        ✓
+                                    </button>
+                                </form>
+                            </td>
+
                             <td><?= $p['left_stock'] ?></td>
                             <td><?= $p['sold'] ?></td>
                             <td>₱<?= number_format($p['sales'], 2) ?></td>
