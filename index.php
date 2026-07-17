@@ -201,8 +201,12 @@ $active_sellers = $pdo->query("SELECT name FROM sellers WHERE status = 'active' 
             <div class="card"><h5>Total Net Profit</h5><p style="color:#10b981;">₱<?= number_format($total_net_all, 2) ?></p></div>
         </div>
 
-        <!-- Breakdown Ledger Layout -->
-        <h3>Product Breakdown</h3>
+        <!-- Breakdown Ledger Layout with Action Button Inline -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; margin-top: 30px;">
+            <h3 style="margin: 0;">Product Breakdown</h3>
+            <a href="add_product.php" class="button" style="background-color: #10b981; border-color: #10b981; padding: 6px 15px; font-size: 0.9rem; margin: 0;">+ Add Product</a>
+        </div>
+
         <div class="scroll-x">
             <table>
                 <thead>

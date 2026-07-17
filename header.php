@@ -19,17 +19,32 @@
     </div>
 
     <!-- Mobile Nav Dropdown (Hidden by default) -->
-    <nav id="mobile-nav" style="display: none; background: #1f2937; border: 1px solid #374151; border-radius: 8px; padding: 10px; position: absolute; width: 100%; left: 0; z-index: 100; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
-        <ul style="display: block; list-style: none; padding: 0; margin: 0;">
-            <li style="margin-bottom: 8px;"><a href="add_product.php" style="display: block; padding: 8px;">➕ Add Product</a></li>
-            <li style="margin-bottom: 8px;"><a href="add_stock.php" style="display: block; padding: 8px;">📦 Add Stock</a></li>
-            <li style="margin-bottom: 8px;"><a href="log_sale.php" style="display: block; padding: 8px;">💰 Log Sale</a></li>
-            <li style="margin-bottom: 8px;"><a href="log_expense.php" style="display: block; padding: 8px;">💸 Log Expense</a></li>
-            <li style="margin-bottom: 8px;"><a href="add_seller.php" style="display: block; padding: 8px;">👥 Workers</a></li>
-            <li><a href="history.php" style="display: block; padding: 8px;">📜 History</a></li>
-        </ul>
-    </nav>
-</header>
+    <nav class="sticky-nav">
+    <ul>
+        <li><strong><a href="index.php" class="secondary">🏠 Home</a></strong></li>
+    </ul>
+    <ul>
+        <li><a href="add_stock.php" class="outline">📥 Stock In</a></li>
+        <li><a href="add_sales.php" class="outline">💰 Record Sale</a></li>
+        <li><a href="add_expense.php" class="outline">📉 Expense</a></li>
+    </ul>
+</nav>
+
+<style>
+.sticky-nav {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    background: #111923; /* Matches standard dark theme background */
+    border-bottom: 1px solid #374151;
+    padding: 10px 20px;
+    margin-bottom: 20px;
+}
+/* Ensure main content doesn't get obscured and handles body padding */
+body {
+    padding-top: 0 !important;
+}
+</style>
 
 <script>
 document.getElementById('menu-toggle').addEventListener('click', function() {
@@ -44,3 +59,4 @@ document.getElementById('menu-toggle').addEventListener('click', function() {
 });
 </script>
 <hr style="margin-top: 5px; margin-bottom: 20px;">
+
