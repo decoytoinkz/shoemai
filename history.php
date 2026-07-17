@@ -1,4 +1,5 @@
 <?php
+require 'auth.php';
 require 'db.php';
 
 // Get the date filter from the URL if it exists (defaults to empty)

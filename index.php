@@ -1,4 +1,5 @@
 <?php
+require 'auth.php';
 require 'db.php';
 
 // 1. Check if a specific seller filter is active
