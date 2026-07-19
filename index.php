@@ -191,9 +191,8 @@ try {
     die("Error processing metrics: " . $e->getMessage());
 }
 
-// Compute cumulative breakdown totals specifically for the table matrix
+// Compute cumulative breakdown totals explicitly for tiles
 $total_stock = array_sum(array_column($products, 'stock_in'));
-$total_left = array_sum(array_column($products, 'left_stock'));
 $total_sold = array_sum(array_column($products, 'sold'));
 $total_sales = array_sum(array_column($products, 'sales'));
 $total_gross_all = array_sum(array_column($products, 'profit'));
@@ -222,9 +221,6 @@ $active_sellers = $pdo->query("SELECT name FROM sellers WHERE status = 'active' 
         .btn-active { background-color: #10b981 !important; color: white !important; border-color: #10b981 !important; }
         .btn-inactive { background-color: #1f2937; color: #9ca3af; border: 1px solid #374151; }
         
-        /* Table footer highlight styling */
-        tfoot tr td { font-weight: bold; background-color: #1a232e; border-top: 2px solid #374151; color: #ffffff; }
-
         @media (max-width: 576px) {
             .grid-analytics { grid-template-columns: 1fr; }
         }
@@ -281,11 +277,33 @@ $active_sellers = $pdo->query("SELECT name FROM sellers WHERE status = 'active' 
             <div class="card"><h5>Total Net Profit</h5><p style="color:#10b981;">₱<?= number_format($total_net_all, 2) ?></p></div>
         </div>
 
-        <!-- Breakdown Ledger Layout with Action Button Inline -->
+        <!-- Breakdown Ledger Layout Header -->
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; margin-top: 30px;">
             <h3 style="margin: 0;">Product Breakdown</h3>
-            <a href="add_stock.php" class="button" style="background-color: #10b981; border-color: #10b981; color: #ffffff; padding: 6px 15px; font-size: 0.9rem; margin: 0;">+ Add Stock</a>
-            <a href="log_sale.php" class="button" style="background-color: #10b981; border-color: #10b981; color: #ffffff; padding: 6px 15px; font-size: 0.9rem; margin: 0;">+ Add Sale</a>
+            <div style="display: flex; gap: 8px;">
+                <a href="add_stock.php" class="button" style="background-color: #10b981; border-color: #10b981; color: #ffffff; padding: 6px 15px; font-size: 0.9rem; margin: 0;">+ Add Stock</a>
+                <a href="log_sale.php" class="button" style="background-color: #10b981; border-color: #10b981; color: #ffffff; padding: 6px 15px; font-size: 0.9rem; margin: 0;">+ Add Sale</a>
+            </div>
+        </div>
+
+        <!-- INTEGRATION: Dedicated Breakdown Information Tiles Row -->
+        <div class="grid-totals" style="margin-bottom: 20px;">
+            <div class="card" style="border-left: 4px solid #9ca3af;">
+                <h5>Breakdown Total Stock</h5>
+                <p><?= $total_stock ?></p>
+            </div>
+            <div class="card" style="border-left: 4px solid #f59e0b;">
+                <h5>Breakdown Total Sold</h5>
+                <p><?= $total_sold ?></p>
+            </div>
+            <div class="card" style="border-left: 4px solid #3b82f6;">
+                <h5>Breakdown Total Sales</h5>
+                <p style="color:#3b82f6;">₱<?= number_format($total_sales, 2) ?></p>
+            </div>
+            <div class="card" style="border-left: 4px solid #10b981;">
+                <h5>Breakdown Total Profit</h5>
+                <p style="color:#10b981;">₱<?= number_format($total_gross_all, 2) ?></p>
+            </div>
         </div>
 
         <div class="scroll-x">
@@ -344,18 +362,6 @@ $active_sellers = $pdo->query("SELECT name FROM sellers WHERE status = 'active' 
                         <tr><td colspan="6" style="text-align: center;">No product data available yet.</td></tr>
                     <?php endif; ?>
                 </tbody>
-                
-                <!-- INTEGRATION: Dynamic Totals Row for the entire matrix -->
-                <tfoot>
-                    <tr>
-                        <td>TOTALS</td>
-                        <td style="text-align: center; font-size: 1.1rem;"><?= $total_stock ?></td>
-                        <td><?= $total_left ?></td>
-                        <td style="text-align: center; font-size: 1.1rem;"><?= $total_sold ?></td>
-                        <td style="color: #10b981;">₱<?= number_format($total_sales, 2) ?></td>
-                        <td style="color: #10b981;">₱<?= number_format($total_gross_all, 2) ?></td>
-                    </tr>
-                </tfoot>
             </table>
         </div>
     </main>
