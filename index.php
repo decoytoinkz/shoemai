@@ -277,6 +277,19 @@ $active_sellers = $pdo->query("SELECT name FROM sellers WHERE status = 'active' 
             <div class="card"><h5>Total Net Profit</h5><p style="color:#10b981;">₱<?= number_format($total_net_all, 2) ?></p></div>
         </div>
 
+        <div class="scroll-x">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Product</th>
+                        <th style="min-width: 140px;">Stock In</th>
+                        <th>Left</th>
+                        <th style="min-width: 140px;">Sold</th>
+                        <th>Sales</th>
+                        <th>Profit</th>
+                    </tr>
+                </thead>
+
         <!-- Breakdown Ledger Layout Header -->
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; margin-top: 30px;">
             <h3 style="margin: 0;">Product Breakdown</h3>
@@ -306,18 +319,6 @@ $active_sellers = $pdo->query("SELECT name FROM sellers WHERE status = 'active' 
             </div>
         </div>
 
-        <div class="scroll-x">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Product</th>
-                        <th style="min-width: 140px;">Stock In</th>
-                        <th>Left</th>
-                        <th style="min-width: 140px;">Sold</th>
-                        <th>Sales</th>
-                        <th>Profit</th>
-                    </tr>
-                </thead>
                 <tbody>
                     <?php if (count($products) > 0): ?>
                         <?php foreach ($products as $p): ?>
