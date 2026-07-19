@@ -191,8 +191,9 @@ try {
     die("Error processing metrics: " . $e->getMessage());
 }
 
-// Compute cumulative totals for display
+// Compute cumulative breakdown totals specifically for the table matrix
 $total_stock = array_sum(array_column($products, 'stock_in'));
+$total_left = array_sum(array_column($products, 'left_stock'));
 $total_sold = array_sum(array_column($products, 'sold'));
 $total_sales = array_sum(array_column($products, 'sales'));
 $total_gross_all = array_sum(array_column($products, 'profit'));
@@ -221,7 +222,9 @@ $active_sellers = $pdo->query("SELECT name FROM sellers WHERE status = 'active' 
         .btn-active { background-color: #10b981 !important; color: white !important; border-color: #10b981 !important; }
         .btn-inactive { background-color: #1f2937; color: #9ca3af; border: 1px solid #374151; }
         
-        /* Small screen responsive adjustments */
+        /* Table footer highlight styling */
+        tfoot tr td { font-weight: bold; background-color: #1a232e; border-top: 2px solid #374151; color: #ffffff; }
+
         @media (max-width: 576px) {
             .grid-analytics { grid-template-columns: 1fr; }
         }
@@ -244,7 +247,6 @@ $active_sellers = $pdo->query("SELECT name FROM sellers WHERE status = 'active' 
         <!-- Profit Breakdown Timeline -->
        <h3>Net Profit Intervals (<?= $seller_filter ? htmlspecialchars($seller_filter) : 'All' ?>)</h3>
         <div class="grid-analytics">
-            <!-- Daily Net Card -->
             <div class="card" style="border-top: 4px solid #3b82f6;">
                 <h5>Daily Net</h5>
                 <p style="color:#3b82f6; margin-bottom: 5px;">₱<?= number_format($daily_net, 2) ?></p>
@@ -283,6 +285,7 @@ $active_sellers = $pdo->query("SELECT name FROM sellers WHERE status = 'active' 
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; margin-top: 30px;">
             <h3 style="margin: 0;">Product Breakdown</h3>
             <a href="add_stock.php" class="button" style="background-color: #10b981; border-color: #10b981; color: #ffffff; padding: 6px 15px; font-size: 0.9rem; margin: 0;">+ Add Stock</a>
+            <a href="log_sale.php" class="button" style="background-color: #10b981; border-color: #10b981; color: #ffffff; padding: 6px 15px; font-size: 0.9rem; margin: 0;">+ Add Sale</a>
         </div>
 
         <div class="scroll-x">
@@ -319,7 +322,7 @@ $active_sellers = $pdo->query("SELECT name FROM sellers WHERE status = 'active' 
 
                             <td><?= $p['left_stock'] ?></td>
                             
-                            <!-- INTEGRATION: Inline Sold Edit Column -->
+                            <!-- Inline Sold Edit Column -->
                             <td>
                                 <form method="POST" action="index.php<?= $seller_filter ? '?seller=' . urlencode($seller_filter) : '' ?>" style="display: flex; align-items: center; gap: 5px; margin: 0;">
                                     <input type="hidden" name="action" value="quick_sold_edit">
@@ -341,6 +344,18 @@ $active_sellers = $pdo->query("SELECT name FROM sellers WHERE status = 'active' 
                         <tr><td colspan="6" style="text-align: center;">No product data available yet.</td></tr>
                     <?php endif; ?>
                 </tbody>
+                
+                <!-- INTEGRATION: Dynamic Totals Row for the entire matrix -->
+                <tfoot>
+                    <tr>
+                        <td>TOTALS</td>
+                        <td style="text-align: center; font-size: 1.1rem;"><?= $total_stock ?></td>
+                        <td><?= $total_left ?></td>
+                        <td style="text-align: center; font-size: 1.1rem;"><?= $total_sold ?></td>
+                        <td style="color: #10b981;">₱<?= number_format($total_sales, 2) ?></td>
+                        <td style="color: #10b981;">₱<?= number_format($total_gross_all, 2) ?></td>
+                    </tr>
+                </tfoot>
             </table>
         </div>
     </main>
