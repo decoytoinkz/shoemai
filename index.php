@@ -416,7 +416,7 @@ $active_sellers = $pdo->query("SELECT name FROM sellers WHERE status = 'active' 
                             </form>
                         </td>
                         <!-- Left column remains completely automated -->
-                        <td style="color: #ffffff; font-size: 1.1rem;"><?= $total_left ?></td>
+                        <td style="color: #ffffff; font-size: 1.1rem;"></td>
                         <td>
                             <form method="POST" action="index.php<?= $seller_filter ? '?seller=' . urlencode($seller_filter) : '' ?>" style="display: flex; align-items: center; gap: 5px; margin: 0;">
                                 <input type="hidden" name="action" value="bulk_totals_edit">
