@@ -95,7 +95,7 @@ if ($isPostgres) {
     $today = "CURRENT_DATE";
     $sales_week_condition = "EXTRACT(WEEK FROM s.date_sold) = EXTRACT(WEEK FROM CURRENT_DATE) AND EXTRACT(YEAR FROM s.date_sold) = EXTRACT(YEAR FROM CURRENT_DATE)";
     $expense_week_condition = "EXTRACT(WEEK FROM e.date_incurred) = EXTRACT(WEEK FROM CURRENT_DATE) AND EXTRACT(YEAR FROM e.date_incurred) = EXTRACT(YEAR FROM CURRENT_DATE)";
-    $sales_month_condition = "EXTRACT(MONTH FROM s.date_sold) = EXTRACT(MONTH FROM CURRENT_DATE) AND EXTRACT(YEAR FROM s.date_sold) = EXTRACT(YEAR YEAR FROM CURRENT_DATE)";
+    $sales_month_condition = "EXTRACT(MONTH FROM s.date_sold) = EXTRACT(MONTH FROM CURRENT_DATE) AND EXTRACT(YEAR FROM s.date_sold) = EXTRACT(YEAR FROM CURRENT_DATE)";
     $expense_month_condition = "EXTRACT(MONTH FROM e.date_incurred) = EXTRACT(MONTH FROM CURRENT_DATE) AND EXTRACT(YEAR FROM e.date_incurred) = EXTRACT(YEAR FROM CURRENT_DATE)";
 } else {
     $today = "CURDATE()";
