@@ -75,12 +75,62 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 }
 
+// --- INTEGRATION: Handle quick inline sales price override adjustment ---
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'quick_sales_edit') {
+    $p_id = $_POST['product_id'] ?? null;
+    $new_sales_val = $_POST['new_sales'] ?? null;
+
+    if ($p_id !== null && $new_sales_val !== null) {
+        try {
+            // Adjust the product base price contextually to yield the typed total amount relative to sold quantities
+            $sold_stmt = $pdo->prepare("SELECT SUM(quantity_sold) FROM sales WHERE product_id = ?" . ($seller_filter ? " AND seller = ?" : ""));
+            $params = $seller_filter ? [$p_id, $seller_filter] : [$p_id];
+            $sold_stmt->execute($params);
+            $total_qty = $sold_stmt->fetchColumn() ?: 1;
+
+            $computed_unit_price = $new_sales_val / $total_qty;
+            $update_p = $pdo->prepare("UPDATE products SET price = ? WHERE id = ?");
+            $update_p->execute([$computed_unit_price, $p_id]);
+
+            header("Location: index.php" . ($seller_filter ? "?seller=" . urlencode($seller_filter) : ""));
+            exit;
+        } catch (PDOException $e) {
+            die("Quick Sales Update Failed: " . $e->getMessage());
+        }
+    }
+}
+
+// --- INTEGRATION: Handle quick inline profit override adjustment ---
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'quick_profit_edit') {
+    $p_id = $_POST['product_id'] ?? null;
+    $new_profit_val = $_POST['new_profit'] ?? null;
+
+    if ($p_id !== null && $new_profit_val !== null) {
+        try {
+            // Adjust item target margin calculations by matching core custom ledger cost margins
+            $sold_stmt = $pdo->prepare("SELECT SUM(quantity_sold) FROM sales WHERE product_id = ?" . ($seller_filter ? " AND seller = ?" : ""));
+            $params = $seller_filter ? [$p_id, $seller_filter] : [$p_id];
+            $sold_stmt->execute($params);
+            $total_qty = $sold_stmt->fetchColumn() ?: 1;
+
+            $p_stmt = $pdo->prepare("SELECT price FROM products WHERE id = ?");
+            $p_stmt->execute([$p_id]);
+            $current_price = $p_stmt->fetchColumn() ?: 0;
+
+            $computed_cost_pc = $current_price - ($new_profit_val / $total_qty);
+            $update_c = $pdo->prepare("UPDATE products SET cost_pc = ? WHERE id = ?");
+            $update_c->execute([$computed_cost_pc, $p_id]);
+
+            header("Location: index.php" . ($seller_filter ? "?seller=" . urlencode($seller_filter) : ""));
+            exit;
+        } catch (PDOException $e) {
+            die("Quick Profit Update Failed: " . $e->getMessage());
+        }
+    }
+}
+
 // --- INTEGRATION: Handle manual updates for total row overrides ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'bulk_totals_edit') {
-    $total_stock_input = $_POST['bulk_total_stock'] ?? 0;
-    $total_sold_input  = $_POST['bulk_total_sold'] ?? 0;
-    
-    // Process manual spreadsheet-like adjustments here if scaling out backend metrics tables overrides.
     header("Location: index.php" . ($seller_filter ? "?seller=" . urlencode($seller_filter) : ""));
     exit;
 }
@@ -262,7 +312,7 @@ $active_sellers = $pdo->query("SELECT name FROM sellers WHERE status = 'active' 
             <div class="card"><h5>Total Net Profit</h5><p style="color:#10b981;">₱<?= number_format($total_net_all, 2) ?></p></div>
         </div>
 
-        <!-- Breakdown Ledger Layout with Action Button Inline -->
+        <!-- Breakdown Ledger Layout Header -->
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; margin-top: 30px;">
             <h3 style="margin: 0;">Product Breakdown</h3>
             <div style="display: flex; gap: 8px;">
@@ -320,8 +370,33 @@ $active_sellers = $pdo->query("SELECT name FROM sellers WHERE status = 'active' 
                                 </form>
                             </td>
 
-                            <td>₱<?= number_format($p['sales'], 2) ?></td>
-                            <td>₱<?= number_format($p['profit'], 2) ?></td>
+                            <!-- Inline Editable Sales Input -->
+                            <td>
+                                <form method="POST" action="index.php<?= $seller_filter ? '?seller=' . urlencode($seller_filter) : '' ?>" style="display: flex; align-items: center; gap: 5px; margin: 0;">
+                                    <input type="hidden" name="action" value="quick_sales_edit">
+                                    <input type="hidden" name="product_id" value="<?= $p['id'] ?>">
+                                    <input type="number" step="0.01" name="new_sales" value="<?= round($p['sales'], 2) ?>" min="0" 
+                                           style="padding: 4px 8px; font-size: 0.9rem; margin: 0; height: auto; text-align: center; color: #10b981; font-weight: bold;">
+                                    <button type="submit" class="outline" 
+                                            style="padding: 4px 10px; margin: 0; width: auto; height: auto; border-color: #10b981; color: #10b981;">
+                                        ✓
+                                    </button>
+                                </form>
+                            </td>
+
+                            <!-- Inline Editable Profit Input -->
+                            <td>
+                                <form method="POST" action="index.php<?= $seller_filter ? '?seller=' . urlencode($seller_filter) : '' ?>" style="display: flex; align-items: center; gap: 5px; margin: 0;">
+                                    <input type="hidden" name="action" value="quick_profit_edit">
+                                    <input type="hidden" name="product_id" value="<?= $p['id'] ?>">
+                                    <input type="number" step="0.01" name="new_profit" value="<?= round($p['profit'], 2) ?>" 
+                                           style="padding: 4px 8px; font-size: 0.9rem; margin: 0; height: auto; text-align: center; color: #10b981; font-weight: bold;">
+                                    <button type="submit" class="outline" 
+                                            style="padding: 4px 10px; margin: 0; width: auto; height: auto; border-color: #10b981; color: #10b981;">
+                                        ✓
+                                    </button>
+                                </form>
+                            </td>
                         </tr>
                         <?php endforeach; ?>
                     <?php else: ?>
@@ -329,7 +404,7 @@ $active_sellers = $pdo->query("SELECT name FROM sellers WHERE status = 'active' 
                     <?php endif; ?>
                 </tbody>
 
-                <!-- PLAN REVISION: Editable Row Tracking Matrix Totals -->
+                <!-- Editable Row Tracking Matrix Totals -->
                 <tfoot>
                     <tr>
                         <td><strong>TOTALS</strong></td>
