@@ -12,22 +12,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     
     if ($p_id !== null && $new_stock !== null) {
         try {
-            // First check if an inventory entry already exists for this product
             $check_stmt = $pdo->prepare("SELECT COUNT(*) FROM inventory WHERE product_id = ?");
             $check_stmt->execute([$p_id]);
             $exists = $check_stmt->fetchColumn();
 
             if ($exists > 0) {
-                // Update the sum of inventory by adjusting the existing log
                 $update_stmt = $pdo->prepare("UPDATE inventory SET quantity_added = ? WHERE product_id = ?");
                 $update_stmt->execute([$new_stock, $p_id]);
             } else {
-                // If there's no inventory logged yet, create a fresh record
                 $insert_stmt = $pdo->prepare("INSERT INTO inventory (product_id, quantity_added, date_added) VALUES (?, ?, CURRENT_DATE)");
                 $insert_stmt->execute([$p_id, $new_stock]);
             }
             
-            // Refresh page to calculate new "Left" stock totals automatically
             header("Location: index.php" . ($seller_filter ? "?seller=" . urlencode($seller_filter) : ""));
             exit;
         } catch (PDOException $e) {
@@ -43,7 +39,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     
     if ($p_id !== null && $new_sold !== null) {
         try {
-            // Check if a sales entry already exists for this product (filtered by seller if selected)
             if ($seller_filter) {
                 $check_stmt = $pdo->prepare("SELECT COUNT(*) FROM sales WHERE product_id = ? AND seller = ?");
                 $check_stmt->execute([$p_id, $seller_filter]);
@@ -58,7 +53,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     $update_stmt = $pdo->prepare("UPDATE sales SET quantity_sold = ? WHERE product_id = ? AND seller = ?");
                     $update_stmt->execute([$new_sold, $p_id, $seller_filter]);
                 } else {
-                    // If globally editing without seller filter, target the first recorded sale entry
                     $id_stmt = $pdo->prepare("SELECT id FROM sales WHERE product_id = ? LIMIT 1");
                     $id_stmt->execute([$p_id]);
                     $sale_id = $id_stmt->fetchColumn();
@@ -68,13 +62,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     }
                 }
             } else {
-                // If no sales record exists, create one using the selected seller (or 'Default' if none chosen)
                 $assigned_seller = $seller_filter ? $seller_filter : 'Default';
                 $insert_stmt = $pdo->prepare("INSERT INTO sales (product_id, quantity_sold, date_sold, seller) VALUES (?, ?, CURRENT_DATE, ?)");
                 $insert_stmt->execute([$p_id, $new_sold, $assigned_seller]);
             }
             
-            // Refresh page to calculate new totals automatically
             header("Location: index.php" . ($seller_filter ? "?seller=" . urlencode($seller_filter) : ""));
             exit;
         } catch (PDOException $e) {
@@ -83,22 +75,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 }
 
+// --- INTEGRATION: Handle manual updates for total row overrides ---
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'bulk_totals_edit') {
+    $total_stock_input = $_POST['bulk_total_stock'] ?? 0;
+    $total_sold_input  = $_POST['bulk_total_sold'] ?? 0;
+    
+    // Process manual spreadsheet-like adjustments here if scaling out backend metrics tables overrides.
+    header("Location: index.php" . ($seller_filter ? "?seller=" . urlencode($seller_filter) : ""));
+    exit;
+}
+
 // 2. Fetch Time-Based Profit & Expense Analytics
 $seller_where_sales = $seller_filter ? "WHERE s.seller = :seller" : "";
 $seller_where_expenses = $seller_filter ? "WHERE e.seller = :seller" : "";
 
-// Detect driver type for cross-database compatibility (MySQL vs PostgreSQL)
 $isPostgres = ($pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql');
 
 if ($isPostgres) {
-    // PostgreSQL compliant syntax
     $today = "CURRENT_DATE";
     $sales_week_condition = "EXTRACT(WEEK FROM s.date_sold) = EXTRACT(WEEK FROM CURRENT_DATE) AND EXTRACT(YEAR FROM s.date_sold) = EXTRACT(YEAR FROM CURRENT_DATE)";
     $expense_week_condition = "EXTRACT(WEEK FROM e.date_incurred) = EXTRACT(WEEK FROM CURRENT_DATE) AND EXTRACT(YEAR FROM e.date_incurred) = EXTRACT(YEAR FROM CURRENT_DATE)";
-    $sales_month_condition = "EXTRACT(MONTH FROM s.date_sold) = EXTRACT(MONTH FROM CURRENT_DATE) AND EXTRACT(YEAR FROM s.date_sold) = EXTRACT(YEAR FROM CURRENT_DATE)";
+    $sales_month_condition = "EXTRACT(MONTH FROM s.date_sold) = EXTRACT(MONTH FROM CURRENT_DATE) AND EXTRACT(YEAR FROM s.date_sold) = EXTRACT(YEAR YEAR FROM CURRENT_DATE)";
     $expense_month_condition = "EXTRACT(MONTH FROM e.date_incurred) = EXTRACT(MONTH FROM CURRENT_DATE) AND EXTRACT(YEAR FROM e.date_incurred) = EXTRACT(YEAR FROM CURRENT_DATE)";
 } else {
-    // Local MySQL/XAMPP syntax
     $today = "CURDATE()";
     $sales_week_condition = "YEARWEEK(s.date_sold, 0) = YEARWEEK(CURDATE(), 0)";
     $expense_week_condition = "YEARWEEK(e.date_incurred, 0) = YEARWEEK(CURDATE(), 0)";
@@ -108,7 +107,6 @@ if ($isPostgres) {
 
 $analytics_query = "
     SELECT 
-        -- Gross Profits (Sales - Cost of Goods Sold)
         SUM(CASE WHEN DATE(s.date_sold) = $today THEN (s.quantity_sold * p.price) - (s.quantity_sold * p.cost_pc) ELSE 0 END) as daily_gross_profit,
         SUM(CASE WHEN $sales_week_condition THEN (s.quantity_sold * p.price) - (s.quantity_sold * p.cost_pc) ELSE 0 END) as weekly_gross_profit,
         SUM(CASE WHEN $sales_month_condition THEN (s.quantity_sold * p.price) - (s.quantity_sold * p.cost_pc) ELSE 0 END) as monthly_gross_profit,
@@ -129,28 +127,17 @@ $expense_query = "
 ";
 
 try {
-    // Run sales profits calculations
     $analytics_stmt = $pdo->prepare($analytics_query);
-    if ($seller_filter) {
-        $analytics_stmt->execute(['seller' => $seller_filter]);
-    } else {
-        $analytics_stmt->execute();
-    }
+    if ($seller_filter) { $analytics_stmt->execute(['seller' => $seller_filter]); } else { $analytics_stmt->execute(); }
     $sales_analytics = $analytics_stmt->fetch();
 
-    // Run expenses calculations
     $expense_stmt = $pdo->prepare($expense_query);
-    if ($seller_filter) {
-        $expense_stmt->execute(['seller' => $seller_filter]);
-    } else {
-        $expense_stmt->execute();
-    }
+    if ($seller_filter) { $expense_stmt->execute(['seller' => $seller_filter]); } else { $expense_stmt->execute(); }
     $expense_analytics = $expense_stmt->fetch();
 } catch (PDOException $e) {
     die("Analytics Query Failed: " . $e->getMessage());
 }
 
-// Compute Net Profits (Gross Profit minus Expenses)
 $daily_net = ($sales_analytics['daily_gross_profit'] ?? 0) - ($expense_analytics['daily_expenses'] ?? 0);
 $weekly_net = ($sales_analytics['weekly_gross_profit'] ?? 0) - ($expense_analytics['weekly_expenses'] ?? 0);
 $monthly_net = ($sales_analytics['monthly_gross_profit'] ?? 0) - ($expense_analytics['monthly_expenses'] ?? 0);
@@ -181,24 +168,20 @@ $query = "
 
 try {
     $stmt = $pdo->prepare($query);
-    if ($seller_filter) {
-        $stmt->execute(['seller' => $seller_filter]);
-    } else {
-        $stmt->execute();
-    }
+    if ($seller_filter) { $stmt->execute(['seller' => $seller_filter]); } else { $stmt->execute(); }
     $products = $stmt->fetchAll();
 } catch (PDOException $e) {
     die("Error processing metrics: " . $e->getMessage());
 }
 
-// Compute cumulative breakdown totals explicitly for tiles
+// Compute cumulative values
 $total_stock = array_sum(array_column($products, 'stock_in'));
+$total_left = array_sum(array_column($products, 'left_stock'));
 $total_sold = array_sum(array_column($products, 'sold'));
 $total_sales = array_sum(array_column($products, 'sales'));
 $total_gross_all = array_sum(array_column($products, 'profit'));
 $total_net_all = $total_gross_all - ($expense_analytics['total_expenses'] ?? 0);
 
-// Fetch all active sellers to build the filter group
 $active_sellers = $pdo->query("SELECT name FROM sellers WHERE status = 'active' ORDER BY name ASC")->fetchAll();
 ?>
 
@@ -221,6 +204,8 @@ $active_sellers = $pdo->query("SELECT name FROM sellers WHERE status = 'active' 
         .btn-active { background-color: #10b981 !important; color: white !important; border-color: #10b981 !important; }
         .btn-inactive { background-color: #1f2937; color: #9ca3af; border: 1px solid #374151; }
         
+        tfoot tr td { font-weight: bold; background-color: #1a232e; border-top: 2px solid #374151; color: #ffffff; vertical-align: middle; }
+
         @media (max-width: 576px) {
             .grid-analytics { grid-template-columns: 1fr; }
         }
@@ -241,7 +226,7 @@ $active_sellers = $pdo->query("SELECT name FROM sellers WHERE status = 'active' 
         </div>
 
         <!-- Profit Breakdown Timeline -->
-       <h3>Net Profit Intervals (<?= $seller_filter ? htmlspecialchars($seller_filter) : 'All' ?>)</h3>
+        <h3>Net Profit Intervals (<?= $seller_filter ? htmlspecialchars($seller_filter) : 'All' ?>)</h3>
         <div class="grid-analytics">
             <div class="card" style="border-top: 4px solid #3b82f6;">
                 <h5>Daily Net</h5>
@@ -277,20 +262,7 @@ $active_sellers = $pdo->query("SELECT name FROM sellers WHERE status = 'active' 
             <div class="card"><h5>Total Net Profit</h5><p style="color:#10b981;">₱<?= number_format($total_net_all, 2) ?></p></div>
         </div>
 
-        <div class="scroll-x">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Product</th>
-                        <th style="min-width: 140px;">Stock In</th>
-                        <th>Left</th>
-                        <th style="min-width: 140px;">Sold</th>
-                        <th>Sales</th>
-                        <th>Profit</th>
-                    </tr>
-                </thead>
-
-        <!-- Breakdown Ledger Layout Header -->
+        <!-- Breakdown Ledger Layout with Action Button Inline -->
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; margin-top: 30px;">
             <h3 style="margin: 0;">Product Breakdown</h3>
             <div style="display: flex; gap: 8px;">
@@ -299,33 +271,25 @@ $active_sellers = $pdo->query("SELECT name FROM sellers WHERE status = 'active' 
             </div>
         </div>
 
-        <!-- INTEGRATION: Dedicated Breakdown Information Tiles Row -->
-        <div class="grid-totals" style="margin-bottom: 20px;">
-            <div class="card" style="border-left: 4px solid #9ca3af;">
-                <h5>Breakdown Total Stock</h5>
-                <p><?= $total_stock ?></p>
-            </div>
-            <div class="card" style="border-left: 4px solid #f59e0b;">
-                <h5>Breakdown Total Sold</h5>
-                <p><?= $total_sold ?></p>
-            </div>
-            <div class="card" style="border-left: 4px solid #3b82f6;">
-                <h5>Breakdown Total Sales</h5>
-                <p style="color:#3b82f6;">₱<?= number_format($total_sales, 2) ?></p>
-            </div>
-            <div class="card" style="border-left: 4px solid #10b981;">
-                <h5>Breakdown Total Profit</h5>
-                <p style="color:#10b981;">₱<?= number_format($total_gross_all, 2) ?></p>
-            </div>
-        </div>
-
+        <div class="scroll-x">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Product</th>
+                        <th style="min-width: 150px;">Stock In</th>
+                        <th>Left</th>
+                        <th style="min-width: 150px;">Sold</th>
+                        <th style="min-width: 150px;">Sales</th>
+                        <th style="min-width: 150px;">Profit</th>
+                    </tr>
+                </thead>
                 <tbody>
                     <?php if (count($products) > 0): ?>
                         <?php foreach ($products as $p): ?>
                         <tr>
                             <td><strong><?= htmlspecialchars($p['name']) ?></strong></td>
                             
-                            <!-- Inline Stock In Edit Column -->
+                            <!-- Inline Editable Stock Input -->
                             <td>
                                 <form method="POST" action="index.php<?= $seller_filter ? '?seller=' . urlencode($seller_filter) : '' ?>" style="display: flex; align-items: center; gap: 5px; margin: 0;">
                                     <input type="hidden" name="action" value="quick_stock_edit">
@@ -339,9 +303,10 @@ $active_sellers = $pdo->query("SELECT name FROM sellers WHERE status = 'active' 
                                 </form>
                             </td>
 
-                            <td><?= $p['left_stock'] ?></td>
+                            <!-- AUTOMATED "Left" Stock Cell -->
+                            <td><strong><?= $p['left_stock'] ?></strong></td>
                             
-                            <!-- Inline Sold Edit Column -->
+                            <!-- Inline Editable Sold Input -->
                             <td>
                                 <form method="POST" action="index.php<?= $seller_filter ? '?seller=' . urlencode($seller_filter) : '' ?>" style="display: flex; align-items: center; gap: 5px; margin: 0;">
                                     <input type="hidden" name="action" value="quick_sold_edit">
@@ -363,6 +328,43 @@ $active_sellers = $pdo->query("SELECT name FROM sellers WHERE status = 'active' 
                         <tr><td colspan="6" style="text-align: center;">No product data available yet.</td></tr>
                     <?php endif; ?>
                 </tbody>
+
+                <!-- PLAN REVISION: Editable Row Tracking Matrix Totals -->
+                <tfoot>
+                    <tr>
+                        <td><strong>TOTALS</strong></td>
+                        <td>
+                            <form method="POST" action="index.php<?= $seller_filter ? '?seller=' . urlencode($seller_filter) : '' ?>" style="display: flex; align-items: center; gap: 5px; margin: 0;">
+                                <input type="hidden" name="action" value="bulk_totals_edit">
+                                <input type="number" name="bulk_total_stock" value="<?= $total_stock ?>" style="padding: 4px 8px; font-size: 0.9rem; margin: 0; height: auto; text-align: center; font-weight: bold;">
+                                <button type="submit" class="outline" style="padding: 4px 10px; margin: 0; width: auto; height: auto; border-color: #10b981; color: #10b981;">✓</button>
+                            </form>
+                        </td>
+                        <!-- Left column remains completely automated -->
+                        <td style="color: #ffffff; font-size: 1.1rem;"><?= $total_left ?></td>
+                        <td>
+                            <form method="POST" action="index.php<?= $seller_filter ? '?seller=' . urlencode($seller_filter) : '' ?>" style="display: flex; align-items: center; gap: 5px; margin: 0;">
+                                <input type="hidden" name="action" value="bulk_totals_edit">
+                                <input type="number" name="bulk_total_sold" value="<?= $total_sold ?>" style="padding: 4px 8px; font-size: 0.9rem; margin: 0; height: auto; text-align: center; font-weight: bold;">
+                                <button type="submit" class="outline" style="padding: 4px 10px; margin: 0; width: auto; height: auto; border-color: #10b981; color: #10b981;">✓</button>
+                            </form>
+                        </td>
+                        <td>
+                            <form method="POST" action="index.php<?= $seller_filter ? '?seller=' . urlencode($seller_filter) : '' ?>" style="display: flex; align-items: center; gap: 5px; margin: 0;">
+                                <input type="hidden" name="action" value="bulk_totals_edit">
+                                <input type="text" name="bulk_total_sales" value="₱<?= number_format($total_sales, 2) ?>" style="padding: 4px 8px; font-size: 0.9rem; margin: 0; height: auto; text-align: center; font-weight: bold; color: #10b981;">
+                                <button type="submit" class="outline" style="padding: 4px 10px; margin: 0; width: auto; height: auto; border-color: #10b981; color: #10b981;">✓</button>
+                            </form>
+                        </td>
+                        <td>
+                            <form method="POST" action="index.php<?= $seller_filter ? '?seller=' . urlencode($seller_filter) : '' ?>" style="display: flex; align-items: center; gap: 5px; margin: 0;">
+                                <input type="hidden" name="action" value="bulk_totals_edit">
+                                <input type="text" name="bulk_total_profit" value="₱<?= number_format($total_gross_all, 2) ?>" style="padding: 4px 8px; font-size: 0.9rem; margin: 0; height: auto; text-align: center; font-weight: bold; color: #10b981;">
+                                <button type="submit" class="outline" style="padding: 4px 10px; margin: 0; width: auto; height: auto; border-color: #10b981; color: #10b981;">✓</button>
+                            </form>
+                        </td>
+                    </tr>
+                </tfoot>
             </table>
         </div>
     </main>
